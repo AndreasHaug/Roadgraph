@@ -1,5 +1,5 @@
 * Roadgraph
   A simple dummy graph structure of data from the norwegian road
-  database(NVDB, Norsk vegdatabandk). Written as a preparation for a
+  database(NVDB, Norsk vegdatabank). A preparation/inspiration for a
   future project.
   
