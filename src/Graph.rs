@@ -181,6 +181,38 @@ impl CustomGraph {
             .map(|x| x.print(nodes, links))
             .collect::<String>()
     }
+
+    pub fn breadth_first(&self, links: &HashMap<String, RoadLink>, nodes: &HashMap<String, Node>) {
+        let mut visited = HashMap::new();
+
+        let mut queue: LinkedList<(String, String)> = LinkedList::new();
+
+        for a in nodes.values() {
+            a.explore_links(&mut visited, links, &mut queue);
+            break;
+        }
+
+        loop {
+            let out = match queue.pop_front() {
+                Some(s) => s,
+                None => break,
+            };
+            let link = links.get(&out.0).unwrap();
+
+            let outnode;
+            if out.1 == "start" {
+                outnode = nodes.get(&link.start).unwrap();
+                println!(
+                    "{:<10}\t------>    \t{:<30}\t------>    \t{}",
+                    link.end, out.0, link.start
+                );
+            }
+            else {
+                outnode = nodes.get(&link.end).unwrap();
+            }
+            outnode.explore_links(&mut visited, links, &mut queue);
+        }
+    }
 }
 
 pub struct Node {
@@ -202,6 +234,30 @@ impl Node {
 
     pub fn visit(&self, visited: &mut HashMap<String, String>) {
         visited.insert(self.id.clone(), self.id.clone());
+    }
+
+    pub fn explore_links(
+        &self,
+        visited: &mut HashMap<String, String>,
+        links: &HashMap<String, RoadLink>,
+        queue: &mut LinkedList<(String, String)>,
+    ) {
+        for a in &self.outgoing_links {
+            let visited_id = (links.get(a).unwrap().end).to_string();
+
+            if !visited.contains_key(&visited_id) {
+                visited.insert(visited_id.to_string(), visited_id.to_string());
+                queue.push_front((a.to_string(), "end".to_string()));
+            }
+        }
+        for a in &self.incoming_links {
+            let visited_id = (links.get(a).unwrap().start).to_string();
+
+            if !visited.contains_key(&visited_id) {
+                visited.insert(visited_id.to_string(), visited_id.to_string());
+                queue.push_front((a.to_string(), "start".to_string()));
+            }
+        }
     }
 
     fn add_incoming(&mut self, linkref: String) {
@@ -235,9 +291,8 @@ impl Node {
     }
 }
 
-#[derive(Hash)]
 pub struct RoadLink {
-    id: String,
+    pub id: String,
     start: String,
     end: String,
     coordinates: LinkedList<Coordinate>,
@@ -280,7 +335,7 @@ impl RoadLink {
         links: &HashMap<String, RoadLink>,
     ) -> String {
         format!(
-            "Link {}:\n\nStartnode: {}\n{}\nEndnode: {}\n{}\nCoordinates: {}\n\n",
+            "Link {}:\n\nStartnode: {}\n{}\nEndnode: {}\n{}\nCoordinates:\n{}\n\n",
             self.id,
             self.start,
             nodes.get(&self.start).unwrap().print_links_to(links),
@@ -302,7 +357,6 @@ impl PartialEq for RoadLink {
 }
 impl Eq for RoadLink {}
 
-#[derive(Hash)]
 struct Coordinate {
     e: String,
     n: String,
@@ -325,25 +379,10 @@ impl std::fmt::Display for Coordinate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}\t{}\t{}",
-            if self.e.contains(".") {
-                String::from(self.e.as_str())
-            }
-            else {
-                String::from(self.e.as_str()) + "\t"
-            },
-            if self.n.contains(".") {
-                String::from(self.n.as_str())
-            }
-            else {
-                String::from(self.n.as_str()) + "\t"
-            },
-            if self.h.contains(".") {
-                String::from(self.h.as_str())
-            }
-            else {
-                String::from(self.h.as_str()) + "\t"
-            },
+            "{:<16}\t{:<16}\t{}",
+            self.e.as_str(),
+            self.n.as_str(),
+            self.h.as_str()
         )
     }
 }

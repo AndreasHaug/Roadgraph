@@ -10,11 +10,11 @@ fn main() {
     let mut links: HashMap<String, Roadgraph::Graph::RoadLink> = HashMap::new();
 
     let mut graph = Roadgraph::Graph::CustomGraph::new();
-    graph.add_links(
-        read_file("testfile.json"),
-        &mut nodes,
-        &mut links,
-    );
-    
+    graph.add_links(read_file("testfile.json"), &mut nodes, &mut links);
+
+    graph.breadth_first(&links, &nodes);
     // println!("{}", graph.print(&nodes, &links));
+    // links.values().for_each(|x| println!("{}", x.id));
+    // println!("Number of nodes: {}", nodes.len());
+    // println!("Number of links: {}", links.len());
 }
