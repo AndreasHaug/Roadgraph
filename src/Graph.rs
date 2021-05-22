@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::{to_string_pretty, Value};
 use std::collections::HashMap;
 use std::collections::LinkedList;
 
@@ -28,7 +28,7 @@ impl GetProperties for Value {
     }
 
     fn print(&self) {
-        println!("{}", serde_json::to_string_pretty(self).unwrap());
+        println!("{}", to_string_pretty(self).unwrap());
     }
 }
 
@@ -40,13 +40,12 @@ trait CreateCoordinates {
 
 impl CreateCoordinates for String {
     fn create_coordinates(&self) -> LinkedList<Coordinate> {
-        let i: usize;
-        if self.starts_with("LINESTRING Z") {
-            i = 14;
+        let i: usize = if self.starts_with("LINESTRING Z") {
+            14
         }
         else {
-            i = 11;
-        }
+            11
+        };
 
         let actual_string = &self[i..self.len() - 1];
         let coordinatestrings: Vec<String> =
@@ -92,34 +91,34 @@ impl CreateCoordinates for String {
     }
 }
 
-pub struct CustomGraph {}
+pub struct Graph {
+    nodes: HashMap<String, Node>,
+    links: HashMap<String, RoadLink>,
+}
 
-impl CustomGraph {
-    pub fn new() -> CustomGraph {
-        CustomGraph {}
-    }
-
-    pub fn add_links(
-        &mut self,
-        json: Value,
-        nodes: &mut HashMap<String, Node>,
-        links: &mut HashMap<String, RoadLink>,
-    ) {
-        for b in json["objekter"].as_array().unwrap() {
-            self.add_startnode(&b, nodes);
-            self.add_endnode(&b, nodes);
-            self.add_link(&b, links);
+impl Graph {
+    pub fn new() -> Graph {
+        Graph {
+            nodes: HashMap::new(),
+            links: HashMap::new(),
         }
     }
 
-    fn add_startnode(&mut self, json: &Value, nodes: &mut HashMap<String, Node>) {
+    pub fn add_links(&mut self, json: Value) {
+        for b in json["objekter"].as_array().unwrap() {
+            self.add_startnode(&b);
+            self.add_endnode(&b);
+            self.add_link(&b);
+        }
+    }
+
+    fn add_startnode(&mut self, json: &Value) {
         self.add_node(
-            nodes,
             json,
             Value::startnode,
             json.linestring().create_startcoordinate(),
         );
-        nodes
+        self.nodes
             .get_mut(&Value::startnode(json))
             .unwrap()
             .add_outgoing(
@@ -130,36 +129,33 @@ impl CustomGraph {
             );
     }
 
-    fn add_endnode(&mut self, json: &Value, nodes: &mut HashMap<String, Node>) {
+    fn add_endnode(&mut self, json: &Value) {
         self.add_node(
-            nodes,
             json,
             Value::endnode,
             json.linestring().create_endcoordinate(),
         );
-        nodes.get_mut(&Value::endnode(json)).unwrap().add_incoming(
-            json["vegreferanse"]["kortform"]
-                .as_str()
-                .unwrap()
-                .to_string(),
-        );
+        self.nodes
+            .get_mut(&Value::endnode(json))
+            .unwrap()
+            .add_incoming(
+                json["vegreferanse"]["kortform"]
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            );
     }
 
-    fn add_node(
-        &mut self,
-        nodes: &mut HashMap<String, Node>,
-        json: &Value,
-        func: fn(&Value) -> String,
-        coordinate: Coordinate,
-    ) {
-        if !nodes.contains_key(&func(json)) {
-            nodes.insert(func(json), Node::new(String::from(func(json)), coordinate));
+    fn add_node(&mut self, json: &Value, func: fn(&Value) -> String, coordinate: Coordinate) {
+        if !self.nodes.contains_key(&func(json)) {
+            self.nodes
+                .insert(func(json), Node::new(String::from(func(json)), coordinate));
         }
     }
 
-    fn add_link(&mut self, json: &Value, links: &mut HashMap<String, RoadLink>) {
-        if !links.contains_key(&json.reference()) {
-            links.insert(
+    fn add_link(&mut self, json: &Value) {
+        if !self.links.contains_key(&json.reference()) {
+            self.links.insert(
                 json.reference(),
                 RoadLink::new(
                     json.reference(),
@@ -171,24 +167,19 @@ impl CustomGraph {
         }
     }
 
-    pub fn print(
-        &self,
-        nodes: &HashMap<String, Node>,
-        links: &HashMap<String, RoadLink>,
-    ) -> String {
-        links
+    pub fn print(&self) -> String {
+        self.links
             .values()
-            .map(|x| x.print(nodes, links))
+            .map(|x| x.print(&self.nodes, &self.links))
             .collect::<String>()
     }
 
-    pub fn breadth_first(&self, links: &HashMap<String, RoadLink>, nodes: &HashMap<String, Node>) {
+    pub fn breadth_first(&self) {
         let mut visited = HashMap::new();
-
         let mut queue: LinkedList<(String, String)> = LinkedList::new();
 
-        for a in nodes.values() {
-            a.explore_links(&mut visited, links, &mut queue);
+        for a in self.nodes.values() {
+            a.explore_links(&mut visited, &self.links, &mut queue);
             break;
         }
 
@@ -197,20 +188,25 @@ impl CustomGraph {
                 Some(s) => s,
                 None => break,
             };
-            let link = links.get(&out.0).unwrap();
+            let link = self.links.get(&out.0).unwrap();
 
             let outnode;
             if out.1 == "start" {
-                outnode = nodes.get(&link.start).unwrap();
+                outnode = self.nodes.get(&link.start).unwrap();
                 println!(
-                    "{:<10}\t------>    \t{:<30}\t------>    \t{}",
+                    "{:<10}\t<------    \t{:<30}\t<------    \t{}",
                     link.end, out.0, link.start
                 );
             }
             else {
-                outnode = nodes.get(&link.end).unwrap();
+                outnode = self.nodes.get(&link.end).unwrap();
+
+                println!(
+                    "{:<10}\t------> \t{:<30}\t------> \t{}",
+                    link.start, out.0, link.end
+                );
             }
-            outnode.explore_links(&mut visited, links, &mut queue);
+            outnode.explore_links(&mut visited, &self.links, &mut queue);
         }
     }
 }
@@ -242,12 +238,15 @@ impl Node {
         links: &HashMap<String, RoadLink>,
         queue: &mut LinkedList<(String, String)>,
     ) {
+        if !visited.contains_key(&self.id) {
+            visited.insert(self.id.to_string(), self.id.to_string());
+        }
         for a in &self.outgoing_links {
             let visited_id = (links.get(a).unwrap().end).to_string();
 
             if !visited.contains_key(&visited_id) {
                 visited.insert(visited_id.to_string(), visited_id.to_string());
-                queue.push_front((a.to_string(), "end".to_string()));
+                queue.push_back((a.to_string(), "end".to_string()));
             }
         }
         for a in &self.incoming_links {
@@ -255,7 +254,7 @@ impl Node {
 
             if !visited.contains_key(&visited_id) {
                 visited.insert(visited_id.to_string(), visited_id.to_string());
-                queue.push_front((a.to_string(), "start".to_string()));
+                queue.push_back((a.to_string(), "start".to_string()));
             }
         }
     }
@@ -270,7 +269,7 @@ impl Node {
 
     pub fn print_links_to(&self, links: &HashMap<String, RoadLink>) -> String {
         format!(
-            "incoming links: {}\noutgoing links: {}\n",
+            "Incoming links: {}\nOutgoing links: {}\n",
             self.print_incoming_links(links),
             self.print_outgoing_links(links)
         )
@@ -350,13 +349,6 @@ impl RoadLink {
     }
 }
 
-impl PartialEq for RoadLink {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-impl Eq for RoadLink {}
-
 struct Coordinate {
     e: String,
     n: String,
@@ -366,12 +358,6 @@ struct Coordinate {
 impl Coordinate {
     fn new(e: String, n: String, h: String) -> Coordinate {
         Coordinate { e: e, n: n, h: h }
-    }
-}
-
-impl PartialEq for Coordinate {
-    fn eq(&self, other: &Self) -> bool {
-        self.e == other.e && self.n == other.n && self.h == other.h
     }
 }
 
