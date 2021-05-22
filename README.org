@@ -2,4 +2,10 @@
   A simple dummy graph structure of data from the norwegian road
   database(NVDB, Norsk vegdatabank). A preparation/inspiration for a
   future project.
+
+  The code demonstrates how a graph datastructure of some NVDB data
+  may be buildt in its simpliest form, nodes and edges connected. In
+  addition it demonstrates a breadth first search from a arbitrary
+  node. The data used here is the representation of the roads in Røst
+  kommune.
   

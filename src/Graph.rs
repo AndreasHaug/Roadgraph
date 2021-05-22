@@ -188,9 +188,10 @@ impl Graph {
                 Some(s) => s,
                 None => break,
             };
-            let link = self.links.get(&out.0).unwrap();
 
+            let link = self.links.get(&out.0).unwrap();
             let outnode;
+
             if out.1 == "start" {
                 outnode = self.nodes.get(&link.start).unwrap();
                 println!(
@@ -200,7 +201,6 @@ impl Graph {
             }
             else {
                 outnode = self.nodes.get(&link.end).unwrap();
-
                 println!(
                     "{:<10}\t------> \t{:<30}\t------> \t{}",
                     link.start, out.0, link.end
