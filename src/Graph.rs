@@ -1,8 +1,9 @@
+use rand::Rng;
 use serde_json::{to_string_pretty, Value};
 use std::collections::HashMap;
 use std::collections::LinkedList;
 
-trait GetProperties {
+trait RoadProperties {
     fn startnode(&self) -> String;
     fn endnode(&self) -> String;
     fn linestring(&self) -> String;
@@ -10,7 +11,7 @@ trait GetProperties {
     fn print(&self);
 }
 
-impl GetProperties for Value {
+impl RoadProperties for Value {
     fn startnode(&self) -> String {
         String::from(self["startnode"].as_str().unwrap())
     }
@@ -54,7 +55,7 @@ impl CreateCoordinates for String {
         let mut coordinates: LinkedList<Coordinate> = LinkedList::new();
 
         for b in &coordinatestrings {
-            let temp_coords = b.split(" ").map(|x| x.to_string()).collect::<Vec<String>>();
+            let temp_coords = b.split(' ').map(|x| x.to_string()).collect::<Vec<String>>();
 
             let c = if temp_coords.len() == 3 {
                 Coordinate::new(
@@ -147,24 +148,22 @@ impl Graph {
     }
 
     fn add_node(&mut self, json: &Value, func: fn(&Value) -> String, coordinate: Coordinate) {
-        if !self.nodes.contains_key(&func(json)) {
-            self.nodes
-                .insert(func(json), Node::new(String::from(func(json)), coordinate));
-        }
+        self.nodes
+            .entry(func(json))
+            .or_insert_with(|| Node::new(func(json), coordinate));
     }
 
     fn add_link(&mut self, json: &Value) {
-        if !self.links.contains_key(&json.reference()) {
-            self.links.insert(
-                json.reference(),
+        self.links
+            .entry(json.reference())
+            .or_insert_with(|| -> RoadLink {
                 RoadLink::new(
                     json.reference(),
                     json.linestring(),
                     json.startnode(),
                     json.endnode(),
-                ),
-            );
-        }
+                )
+            });
     }
 
     pub fn print(&self) -> String {
@@ -178,17 +177,13 @@ impl Graph {
         let mut visited = HashMap::new();
         let mut queue: LinkedList<(String, String)> = LinkedList::new();
 
-        for a in self.nodes.values() {
-            a.explore_links(&mut visited, &self.links, &mut queue);
-            break;
-        }
+        self.nodes
+            .values()
+            .nth(rand::thread_rng().gen_range(0..self.nodes.len() - 1))
+            .unwrap()
+            .explore_links(&mut visited, &self.links, &mut queue);
 
-        loop {
-            let out = match queue.pop_front() {
-                Some(s) => s,
-                None => break,
-            };
-
+        while let Some(out) = queue.pop_front() {
             let link = self.links.get(&out.0).unwrap();
             let outnode;
 
@@ -196,7 +191,7 @@ impl Graph {
                 outnode = self.nodes.get(&link.start).unwrap();
                 println!(
                     "{:<10}\t<------    \t{:<30}\t<------    \t{}",
-                    link.end, out.0, link.start
+                    link.end, out.0, link.start,
                 );
             }
             else {
@@ -223,8 +218,8 @@ impl Node {
         Node {
             outgoing_links: Vec::new(),
             incoming_links: Vec::new(),
-            id: id,
-            coordinate: coordinate,
+            id,
+            coordinate,
         }
     }
 
@@ -300,10 +295,10 @@ pub struct RoadLink {
 impl RoadLink {
     fn new(id: String, raw_linestring: String, start: String, end: String) -> RoadLink {
         RoadLink {
-            id: id,
+            id,
             coordinates: raw_linestring.create_coordinates(),
-            start: start,
-            end: end,
+            start,
+            end,
         }
     }
 
@@ -357,7 +352,7 @@ struct Coordinate {
 
 impl Coordinate {
     fn new(e: String, n: String, h: String) -> Coordinate {
-        Coordinate { e: e, n: n, h: h }
+        Coordinate { e, n, h }
     }
 }
 
