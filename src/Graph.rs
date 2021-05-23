@@ -41,11 +41,9 @@ trait CreateCoordinates {
 
 impl CreateCoordinates for String {
     fn create_coordinates(&self) -> LinkedList<Coordinate> {
-        let i: usize = if self.starts_with("LINESTRING Z") {
-            14
-        }
-        else {
-            11
+        let i: usize = match self.starts_with("LINESTRING Z") {
+            true => 14,
+            _ => 11,
         };
 
         let actual_string = &self[i..self.len() - 1];
@@ -57,21 +55,14 @@ impl CreateCoordinates for String {
         for b in &coordinatestrings {
             let temp_coords = b.split(' ').map(|x| x.to_string()).collect::<Vec<String>>();
 
-            let c = if temp_coords.len() == 3 {
-                Coordinate::new(
-                    String::from(temp_coords[0].as_str()),
-                    String::from(temp_coords[1].as_str()),
-                    String::from(temp_coords[2].as_str()),
-                )
-            }
-            else {
-                Coordinate::new(
-                    String::from(temp_coords[0].as_str()),
-                    String::from(temp_coords[1].as_str()),
-                    String::from("N/A"),
-                )
-            };
-            coordinates.push_back(c);
+            coordinates.push_back(Coordinate::new(
+                String::from(temp_coords[0].as_str()),
+                String::from(temp_coords[1].as_str()),
+                match temp_coords.len() {
+                    3 => String::from(temp_coords[2].as_str()),
+                    _ => String::from("N/A"),
+                },
+            ));
         }
 
         coordinates
